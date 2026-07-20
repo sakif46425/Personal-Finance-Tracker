@@ -1,11 +1,3 @@
-/* =====================================
-   SPENDWISE PERSONAL FINANCE TRACKER
-===================================== */
-
-/* =========================
-   VARIABLES
-========================= */
-
 let transactions =
   JSON.parse(localStorage.getItem("spendwiseTransactions")) || [];
 
@@ -15,23 +7,13 @@ let showAllTransactions = false;
 
 let expenseChart;
 
-/* =========================
-   DOM ELEMENTS
-========================= */
+/* DOM */
 
 const modalOverlay = document.getElementById("modalOverlay");
-
-const modalTitle = document.getElementById("modalTitle");
 
 const transactionForm = document.getElementById("transactionForm");
 
 const transactionList = document.getElementById("transactionList");
-
-const totalBalance = document.getElementById("totalBalance");
-
-const totalIncome = document.getElementById("totalIncome");
-
-const totalExpense = document.getElementById("totalExpense");
 
 const categoryList = document.getElementById("categoryList");
 
@@ -39,20 +21,35 @@ const searchInput = document.getElementById("searchInput");
 
 const typeFilter = document.getElementById("typeFilter");
 
-const themeBtn = document.getElementById("themeBtn");
+const toast = document.getElementById("toast");
 
-const sidebar = document.getElementById("sidebar");
+/* CURRENCY */
 
-/* =========================
-   MODAL
-========================= */
+function formatCurrency(amount) {
+  return `৳ ${amount.toLocaleString("en-BD", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
 
-function openModal(type = "income") {
+/* TOAST */
+
+function showToast(message) {
+  document.getElementById("toastMessage").textContent = message;
+
+  toast.classList.add("show");
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+  }, 3000);
+}
+
+/* MODAL */
+
+function openModal(type) {
   currentType = type;
 
   modalOverlay.classList.add("show");
-
-  modalTitle.textContent = type === "income" ? "Add Income" : "Add Expense";
 
   setTransactionType(type);
 
@@ -69,7 +66,13 @@ function closeModal() {
   setTransactionType("income");
 }
 
-/* CLOSE MODAL */
+document
+  .getElementById("incomeBtn")
+  .addEventListener("click", () => openModal("income"));
+
+document
+  .getElementById("expenseBtn")
+  .addEventListener("click", () => openModal("expense"));
 
 document.getElementById("closeModal").addEventListener("click", closeModal);
 
@@ -81,9 +84,7 @@ modalOverlay.addEventListener("click", function (e) {
   }
 });
 
-/* =========================
-   TYPE SELECT
-========================= */
+/* TYPE */
 
 const typeOptions = document.querySelectorAll(".type-option");
 
@@ -104,93 +105,74 @@ function setTransactionType(type) {
 
   selected.classList.add(type === "income" ? "active" : "expense-active");
 
-  modalTitle.textContent = type === "income" ? "Add Income" : "Add Expense";
+  document.getElementById("modalTitle").textContent =
+    type === "income" ? "Add Income" : "Add Expense";
 }
 
-/* =========================
-   ADD TRANSACTION
-========================= */
+/* ADD TRANSACTION */
 
 transactionForm.addEventListener("submit", function (e) {
   e.preventDefault();
 
-  const title = document.getElementById("transactionTitle").value.trim();
-
-  const amount = Number(document.getElementById("amount").value);
-
-  const date = document.getElementById("date").value;
-
-  const category = document.getElementById("category").value;
-
-  const note = document.getElementById("note").value.trim();
-
-  if (!title || !amount || !date || !category) {
-    alert("Please fill all required fields.");
-
-    return;
-  }
-
   const transaction = {
     id: Date.now(),
 
-    title,
+    title: document.getElementById("transactionTitle").value.trim(),
 
-    amount,
+    amount: Number(document.getElementById("amount").value),
 
-    date,
+    date: document.getElementById("date").value,
 
-    category,
+    category: document.getElementById("category").value,
 
-    note,
+    note: document.getElementById("note").value.trim(),
 
     type: currentType,
   };
 
   transactions.unshift(transaction);
 
-  saveTransactions();
+  saveData();
 
   renderAll();
 
   closeModal();
+
+  showToast(
+    currentType === "income"
+      ? "Income added successfully!"
+      : "Expense added successfully!",
+  );
 });
 
-/* =========================
-   SAVE DATA
-========================= */
+/* SAVE */
 
-function saveTransactions() {
-  localStorage.setItem(
-    "spendwiseTransactions",
-
-    JSON.stringify(transactions),
-  );
+function saveData() {
+  localStorage.setItem("spendwiseTransactions", JSON.stringify(transactions));
 }
 
-/* =========================
-   CALCULATE TOTALS
-========================= */
+/* TOTALS */
 
 function calculateTotals() {
   const income = transactions
 
-    .filter((transaction) => transaction.type === "income")
+    .filter((t) => t.type === "income")
 
-    .reduce((total, transaction) => total + transaction.amount, 0);
+    .reduce((sum, t) => sum + t.amount, 0);
 
   const expense = transactions
 
-    .filter((transaction) => transaction.type === "expense")
+    .filter((t) => t.type === "expense")
 
-    .reduce((total, transaction) => total + transaction.amount, 0);
+    .reduce((sum, t) => sum + t.amount, 0);
 
   const balance = income - expense;
 
-  totalIncome.textContent = formatCurrency(income);
+  document.getElementById("totalIncome").textContent = formatCurrency(income);
 
-  totalExpense.textContent = formatCurrency(expense);
+  document.getElementById("totalExpense").textContent = formatCurrency(expense);
 
-  totalBalance.textContent = formatCurrency(balance);
+  document.getElementById("totalBalance").textContent = formatCurrency(balance);
 
   const percentage = income > 0 ? ((balance / income) * 100).toFixed(1) : 0;
 
@@ -198,20 +180,7 @@ function calculateTotals() {
     `${percentage >= 0 ? "+" : ""}${percentage}%`;
 }
 
-/* =========================
-   FORMAT CURRENCY
-========================= */
-
-function formatCurrency(amount) {
-  return `৳ ${amount.toLocaleString("en-BD", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-/* =========================
-   FORMAT DATE
-========================= */
+/* DATE */
 
 function formatDate(date) {
   return new Date(date).toLocaleDateString("en-BD", {
@@ -221,39 +190,35 @@ function formatDate(date) {
   });
 }
 
-/* =========================
-   RENDER TRANSACTIONS
-========================= */
+/* TRANSACTIONS */
 
 function renderTransactions() {
-  let filteredTransactions = [...transactions];
+  let filtered = [...transactions];
 
-  const searchTerm = searchInput.value.toLowerCase().trim();
+  const search = searchInput.value.toLowerCase().trim();
 
-  const selectedType = typeFilter.value;
+  const filter = typeFilter.value;
 
-  if (searchTerm) {
-    filteredTransactions = filteredTransactions.filter(
-      (transaction) =>
-        transaction.title.toLowerCase().includes(searchTerm) ||
-        transaction.category.toLowerCase().includes(searchTerm),
+  if (search) {
+    filtered = filtered.filter(
+      (t) =>
+        t.title.toLowerCase().includes(search) ||
+        t.category.toLowerCase().includes(search),
     );
   }
 
-  if (selectedType !== "all") {
-    filteredTransactions = filteredTransactions.filter(
-      (transaction) => transaction.type === selectedType,
-    );
+  if (filter !== "all") {
+    filtered = filtered.filter((t) => t.type === filter);
   }
 
   if (!showAllTransactions) {
-    filteredTransactions = filteredTransactions.slice(0, 5);
+    filtered = filtered.slice(0, 5);
   }
 
-  if (filteredTransactions.length === 0) {
+  if (filtered.length === 0) {
     transactionList.innerHTML = `
 
-            <tr class="empty-row">
+            <tr>
 
                 <td colspan="5">
 
@@ -261,12 +226,8 @@ function renderTransactions() {
 
                         <i class="fa-solid fa-receipt"></i>
 
-                        <h3>
-                            No transactions found
-                        </h3>
-
                         <p>
-                            Try adding a new transaction
+                            No transactions found
                         </p>
 
                     </div>
@@ -280,163 +241,132 @@ function renderTransactions() {
     return;
   }
 
-  transactionList.innerHTML = filteredTransactions
+  transactionList.innerHTML = filtered
     .map(
-      (transaction) => `
+      (t) => `
 
-        <tr>
+            <tr>
 
-            <td>
+                <td>
 
-                <div class="transaction-title">
+                    <div class="transaction-title">
 
-                    <div class="
-                        transaction-icon
-                        ${transaction.type}
-                    ">
+                        <div class="
+                            transaction-icon
+                            ${t.type}
+                        ">
 
-                        <i class="fa-solid
-                            ${
-                              transaction.type === "income"
-                                ? "fa-arrow-down"
-                                : "fa-arrow-up"
-                            }
+                            <i class="fa-solid
+                                ${
+                                  t.type === "income"
+                                    ? "fa-arrow-down"
+                                    : "fa-arrow-up"
+                                }
+                            "></i>
+
+                        </div>
+
+                        <div>
+
+                            <strong>
+                                ${t.title}
+                            </strong>
+
+                            <small>
+                                ${t.note || "No note"}
+                            </small>
+
+                        </div>
+
+                    </div>
+
+                </td>
+
+
+                <td>
+
+                    <span class="category-badge">
+
+                        ${t.category}
+
+                    </span>
+
+                </td>
+
+
+                <td>
+                    ${formatDate(t.date)}
+                </td>
+
+
+                <td class="
+                    ${t.type === "income" ? "income-amount" : "expense-amount"}
+                ">
+
+                    ${t.type === "income" ? "+" : "-"}
+
+                    ${formatCurrency(t.amount)}
+
+                </td>
+
+
+                <td>
+
+                    <button
+                        class="delete-btn"
+                        onclick="
+                            deleteTransaction(${t.id})
+                        "
+                    >
+
+                        <i class="
+                            fa-solid
+                            fa-trash
                         "></i>
 
-                    </div>
+                    </button>
 
-                    <div>
+                </td>
 
-                        <strong>
-                            ${transaction.title}
-                        </strong>
+            </tr>
 
-                        <small>
-                            ${transaction.note || "No note"}
-                        </small>
-
-                    </div>
-
-                </div>
-
-            </td>
-
-
-            <td>
-
-                <span class="category-badge">
-
-                    ${transaction.category}
-
-                </span>
-
-            </td>
-
-
-            <td>
-
-                ${formatDate(transaction.date)}
-
-            </td>
-
-
-            <td class="
-                ${
-                  transaction.type === "income"
-                    ? "income-amount"
-                    : "expense-amount"
-                }
-            ">
-
-                ${transaction.type === "income" ? "+" : "-"}
-
-                ${formatCurrency(transaction.amount)}
-
-            </td>
-
-
-            <td>
-
-                <button
-
-                    class="delete-btn"
-
-                    onclick="
-                        deleteTransaction(
-                            ${transaction.id}
-                        )
-                    "
-
-                >
-
-                    <i class="
-                        fa-solid
-                        fa-trash
-                    "></i>
-
-                </button>
-
-            </td>
-
-        </tr>
-
-    `,
+        `,
     )
     .join("");
 }
 
-/* =========================
-   DELETE TRANSACTION
-========================= */
+/* DELETE */
 
 function deleteTransaction(id) {
-  const confirmDelete = confirm(
-    "Are you sure you want to delete this transaction?",
-  );
+  transactions = transactions.filter((t) => t.id !== id);
 
-  if (!confirmDelete) {
-    return;
-  }
-
-  transactions = transactions.filter((transaction) => transaction.id !== id);
-
-  saveTransactions();
+  saveData();
 
   renderAll();
+
+  showToast("Transaction deleted successfully.");
 }
 
-/* =========================
-   CATEGORY DATA
-========================= */
+/* CATEGORIES */
 
 function getCategoryData() {
-  const expenses = transactions.filter(
-    (transaction) => transaction.type === "expense",
-  );
+  const result = {};
 
-  const categoryTotals = {};
+  transactions
 
-  expenses.forEach((transaction) => {
-    if (!categoryTotals[transaction.category]) {
-      categoryTotals[transaction.category] = 0;
-    }
+    .filter((t) => t.type === "expense")
 
-    categoryTotals[transaction.category] += transaction.amount;
-  });
+    .forEach((t) => {
+      result[t.category] = (result[t.category] || 0) + t.amount;
+    });
 
-  return Object.entries(categoryTotals)
-
-    .sort((a, b) => b[1] - a[1]);
+  return Object.entries(result).sort((a, b) => b[1] - a[1]);
 }
-
-/* =========================
-   RENDER CATEGORIES
-========================= */
 
 function renderCategories() {
   const categories = getCategoryData();
 
-  if (categories.length === 0) {
+  if (!categories.length) {
     categoryList.innerHTML = `
 
             <div class="empty-state">
@@ -456,19 +386,12 @@ function renderCategories() {
 
   const icons = {
     Food: "🍔",
-
     Transport: "🚗",
-
     Shopping: "🛍️",
-
     Bills: "💡",
-
     Entertainment: "🎮",
-
     Health: "🏥",
-
     Education: "📚",
-
     Other: "📦",
   };
 
@@ -477,49 +400,43 @@ function renderCategories() {
     .map(
       ([category, amount]) => `
 
-        <div class="category-item">
+                    <div class="category-item">
 
-            <div class="category-icon">
+                        <div class="category-icon">
 
-                ${icons[category] || "📦"}
+                            ${icons[category] || "📦"}
 
-            </div>
+                        </div>
 
-            <div class="category-info">
+                        <div class="category-info">
 
-                <strong>
-                    ${category}
-                </strong>
+                            <strong>
+                                ${category}
+                            </strong>
 
-                <small>
-                    Expense category
-                </small>
+                            <small>
+                                Spending category
+                            </small>
 
-            </div>
+                        </div>
 
-            <div class="category-amount">
+                        <div class="category-amount">
 
-                ${formatCurrency(amount)}
+                            ${formatCurrency(amount)}
 
-            </div>
+                        </div>
 
-        </div>
+                    </div>
 
-    `,
+                `,
     )
     .join("");
 }
 
-/* =========================
-   CHART
-========================= */
+/* CHART */
 
 function renderChart() {
   const categories = getCategoryData();
-
-  const labels = categories.map((item) => item[0]);
-
-  const data = categories.map((item) => item[1]);
 
   const ctx = document.getElementById("expenseChart").getContext("2d");
 
@@ -531,15 +448,15 @@ function renderChart() {
     type: "doughnut",
 
     data: {
-      labels,
+      labels: categories.map((item) => item[0]),
 
       datasets: [
         {
-          data,
+          data: categories.map((item) => item[1]),
 
           borderWidth: 0,
 
-          hoverOffset: 8,
+          hoverOffset: 10,
         },
       ],
     },
@@ -549,7 +466,7 @@ function renderChart() {
 
       maintainAspectRatio: false,
 
-      cutout: "70%",
+      cutout: "72%",
 
       plugins: {
         legend: {
@@ -561,7 +478,7 @@ function renderChart() {
             padding: 18,
 
             font: {
-              size: 11,
+              size: 10,
             },
           },
         },
@@ -570,85 +487,71 @@ function renderChart() {
   });
 }
 
-/* =========================
-   SEARCH & FILTER
-========================= */
+/* SEARCH */
 
-searchInput.addEventListener(
-  "input",
+searchInput.addEventListener("input", renderTransactions);
 
-  renderTransactions,
-);
+typeFilter.addEventListener("change", renderTransactions);
 
-typeFilter.addEventListener(
-  "change",
-
-  renderTransactions,
-);
-
-/* =========================
-   VIEW ALL
-========================= */
+/* VIEW ALL */
 
 document.getElementById("viewAllBtn").addEventListener("click", function () {
   showAllTransactions = !showAllTransactions;
 
   this.innerHTML = showAllTransactions
-    ? `Show Less
+    ? `
+                        Show Less
                         <i class="
                             fa-solid
                             fa-arrow-up
-                        ">
-                        </i>`
-    : `View All
+                        "></i>
+                    `
+    : `
+                        View All
                         <i class="
                             fa-solid
                             fa-arrow-right
-                        ">
-                        </i>`;
+                        "></i>
+                    `;
 
   renderTransactions();
 });
 
-/* =========================
-   DARK MODE
-========================= */
+/* DARK MODE */
 
-themeBtn.addEventListener(
-  "click",
+const themeBtn = document.getElementById("themeBtn");
 
-  function () {
-    document.body.classList.toggle("dark");
+themeBtn.addEventListener("click", function () {
+  document.body.classList.toggle("dark");
 
-    const isDark = document.body.classList.contains("dark");
+  const isDark = document.body.classList.contains("dark");
 
-    localStorage.setItem("spendwiseDarkMode", isDark);
+  localStorage.setItem("spendwiseDarkMode", isDark);
 
-    this.innerHTML = isDark
-      ? `
-                <i class="
-                    fa-solid
-                    fa-sun
-                "></i>
+  this.innerHTML = isDark
+    ? `
+                    <i class="
+                        fa-solid
+                        fa-sun
+                    "></i>
 
-                <span>
-                    Light Mode
-                </span>
-            `
-      : `
-                <i class="
-                    fa-solid
-                    fa-moon
-                "></i>
+                    <span>
+                        Light Mode
+                    </span>
+                `
+    : `
+                    <i class="
+                        fa-solid
+                        fa-moon
+                    "></i>
 
-                <span>
-                    Dark Mode
-                </span>
-            `;
-  },
-);
+                    <span>
+                        Dark Mode
+                    </span>
+                `;
+});
 
-/* LOAD DARK MODE */
+/* LOAD THEME */
 
 if (localStorage.getItem("spendwiseDarkMode") === "true") {
   document.body.classList.add("dark");
@@ -667,29 +570,25 @@ if (localStorage.getItem("spendwiseDarkMode") === "true") {
     `;
 }
 
-/* =========================
-   SIDEBAR MOBILE
-========================= */
+/* MOBILE SIDEBAR */
 
 document.getElementById("menuBtn").addEventListener("click", function () {
-  sidebar.classList.toggle("open");
+  document.getElementById("sidebar").classList.toggle("open");
 });
 
-/* =========================
-   BUTTON EVENTS
-========================= */
+/* NAVIGATION ACTIVE */
 
-document
-  .getElementById("incomeBtn")
-  .addEventListener("click", () => openModal("income"));
+document.querySelectorAll(".nav-item").forEach((item) => {
+  item.addEventListener("click", function () {
+    document
+      .querySelectorAll(".nav-item")
+      .forEach((nav) => nav.classList.remove("active"));
 
-document
-  .getElementById("expenseBtn")
-  .addEventListener("click", () => openModal("expense"));
+    this.classList.add("active");
+  });
+});
 
-/* =========================
-   RENDER EVERYTHING
-========================= */
+/* RENDER */
 
 function renderAll() {
   calculateTotals();
@@ -700,9 +599,5 @@ function renderAll() {
 
   renderChart();
 }
-
-/* =========================
-   INITIAL LOAD
-========================= */
 
 renderAll();
