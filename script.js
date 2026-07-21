@@ -471,6 +471,8 @@ function getTotals() {
     expense,
 
     balance: income - expense,
+
+    savings: income - expense,
   };
 }
 
@@ -482,6 +484,8 @@ function updateSummary() {
   get("expense").textContent = formatMoney(totals.expense);
 
   get("balance").textContent = formatMoney(totals.balance);
+
+  get("savings").textContent = formatMoney(totals.savings);
 
   get("income2").textContent = formatMoney(totals.income);
 
@@ -706,40 +710,197 @@ function deleteTransaction(id) {
    CHARTS
 ========================= */
 
-function renderCharts() {
-  const totals = getTotals();
+function getMonthlyTrend(monthsCount) {
+  const count = monthsCount || 6;
 
-  const max = Math.max(totals.income, totals.expense, 1);
+  const now = new Date();
 
-  const incomeHeight = Math.max((totals.income / max) * 220, 5);
+  const months = [];
 
-  const expenseHeight = Math.max((totals.expense / max) * 220, 5);
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+
+    months.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+
+      label: d.toLocaleDateString("en-US", { month: "short" }),
+
+      income: 0,
+
+      expense: 0,
+    });
+  }
+
+  currentUser.transactions.forEach((transaction) => {
+    const key = String(transaction.date).slice(0, 7);
+
+    const month = months.find((item) => item.key === key);
+
+    if (!month) return;
+
+    if (transaction.type === "income") {
+      month.income += Number(transaction.amount);
+    } else {
+      month.expense += Number(transaction.amount);
+    }
+  });
+
+  months.forEach((month) => {
+    month.savings = month.income - month.expense;
+  });
+
+  return months;
+}
+
+function renderTrendChart() {
+  const months = getMonthlyTrend(6);
+
+  const width = 600;
+
+  const height = 260;
+
+  const paddingLeft = 46;
+
+  const paddingRight = 16;
+
+  const paddingTop = 20;
+
+  const paddingBottom = 30;
+
+  const chartWidth = width - paddingLeft - paddingRight;
+
+  const chartHeight = height - paddingTop - paddingBottom;
+
+  const values = months.flatMap((month) => [
+    month.income,
+    month.expense,
+    month.savings,
+  ]);
+
+  const maxValue = Math.max(...values, 1);
+
+  const minValue = Math.min(...values, 0);
+
+  const range = maxValue - minValue || 1;
+
+  const xStep = chartWidth / Math.max(months.length - 1, 1);
+
+  const xPos = (index) => paddingLeft + index * xStep;
+
+  const yPos = (value) =>
+    paddingTop + chartHeight - ((value - minValue) / range) * chartHeight;
+
+  const buildPoints = (key) =>
+    months
+      .map((month, index) => `${xPos(index)},${yPos(month[key])}`)
+      .join(" ");
+
+  const baselineY = yPos(0);
+
+  const savingsAreaPoints = `${xPos(0)},${baselineY} ${buildPoints(
+    "savings",
+  )} ${xPos(months.length - 1)},${baselineY}`;
+
+  const gridLines = [0, 0.25, 0.5, 0.75, 1]
+    .map((fraction) => {
+      const y = paddingTop + chartHeight * fraction;
+
+      const value = maxValue - range * fraction;
+
+      return `
+
+          <line
+            class="grid-line"
+            x1="${paddingLeft}"
+            y1="${y}"
+            x2="${width - paddingRight}"
+            y2="${y}"
+          ></line>
+
+          <text x="4" y="${y + 3}">৳${Math.round(value)}</text>
+
+        `;
+    })
+    .join("");
+
+  const monthLabels = months
+    .map(
+      (month, index) => `
+        <text x="${xPos(index)}" y="${height - 8}" text-anchor="middle">
+          ${month.label}
+        </text>
+      `,
+    )
+    .join("");
+
+  const buildDots = (key, className) =>
+    months
+      .map((month, index) => {
+        const cx = xPos(index);
+
+        const cy = yPos(month[key]);
+
+        return `<circle class="${className}" cx="${cx}" cy="${cy}" r="4"><title>${
+          month.label
+        } ${key}: ৳${formatMoney(month[key])}</title></circle>`;
+      })
+      .join("");
 
   get("chart").innerHTML = `
 
-      <div
-        class="bar income-bar"
-        style="height:${incomeHeight}px"
-      >
+      <div class="chart-legend">
+        <div class="legend-item">
+          <span class="legend-dot income-dot"></span>
+          Income
+        </div>
 
-        <span>
-          ৳${formatMoney(totals.income)}
-        </span>
+        <div class="legend-item">
+          <span class="legend-dot expense-dot"></span>
+          Expense
+        </div>
 
+        <div class="legend-item">
+          <span class="legend-dot savings-dot"></span>
+          Savings
+        </div>
       </div>
 
-      <div
-        class="bar expense-bar"
-        style="height:${expenseHeight}px"
+      <svg
+        class="trend-chart"
+        viewBox="0 0 ${width} ${height}"
+        xmlns="http://www.w3.org/2000/svg"
       >
 
-        <span>
-          ৳${formatMoney(totals.expense)}
-        </span>
+        <defs>
+          <linearGradient id="savingsGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" style="stop-color:var(--secondary); stop-opacity:0.6"></stop>
+            <stop offset="100%" style="stop-color:var(--secondary); stop-opacity:0"></stop>
+          </linearGradient>
+        </defs>
 
-      </div>
+        ${gridLines}
+
+        <polygon class="savings-area" points="${savingsAreaPoints}"></polygon>
+
+        <polyline class="line-income" points="${buildPoints("income")}"></polyline>
+
+        <polyline class="line-expense" points="${buildPoints("expense")}"></polyline>
+
+        <polyline class="line-savings" points="${buildPoints("savings")}"></polyline>
+
+        ${buildDots("income", "income-text")}
+        ${buildDots("expense", "expense-text")}
+        ${buildDots("savings", "savings-text")}
+
+        ${monthLabels}
+
+      </svg>
 
     `;
+}
+
+function renderCharts() {
+  renderTrendChart();
 
   const categories = {};
 
